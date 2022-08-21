@@ -1,2 +1,2 @@
-bucket_name = "devops-circleci-mumbai
+bucket_name = "devops-circleci-mumbai"
 environment = "nonprod"
