@@ -2,25 +2,48 @@
 # See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
 
-# Define a job to be invoked later in a workflow.
-# See: https://circleci.com/docs/2.0/configuration-reference/#jobs
-jobs:
-  say-hello:
-    # Specify the execution environment. You can specify an image from Dockerhub or use one of our Convenience Images from CircleCI's Developer Hub.
-    # See: https://circleci.com/docs/2.0/configuration-reference/#docker-machine-macos-windows-executor
+executors:
+  terraform-agent:
     docker:
-      - image: cimg/base:stable
-    # Add steps to the job
-    # See: https://circleci.com/docs/2.0/configuration-reference/#steps
+      - image: hashicorp/terraform:1.0.0
+
+jobs:
+  plan:
+    executor: terraform-agent
+    parameters:
+      working-dir:
+        type: string
     steps:
       - checkout
       - run:
-          name: "Say hello"
-          command: "echo Hello, World!"
+          name: terraform plan
+          command: cd terraform/<< parameters.working-dir >> && terraform init && terraform plan
+  apply:
+    executor: terraform-agent
+    parameters:
+      working-dir:
+        type: string
+    steps:
+      - checkout
+      - run:
+          name: terraform apply
+          command: cd terraform/<< parameters.working-dir >> && terraform init && terraform apply -auto-approve
 
-# Invoke jobs via workflows
-# See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
-  say-hello-workflow:
+  infrastructure:
     jobs:
-      - say-hello
+      - plan:
+          name: s3_plan
+          context: nonprod
+          working-dir: s3
+      - approval-gate:
+          name: s3_apply_approval
+          type: approval
+          requires:
+            - s3_plan
+      - apply:
+          name: s3_apply
+          context: nonprod
+          working-dir: s3
+          requires:
+            - s3_apply_approval
